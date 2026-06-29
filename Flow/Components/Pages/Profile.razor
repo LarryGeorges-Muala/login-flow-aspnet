@@ -1,0 +1,187 @@
+﻿@using System.Linq
+@page "/profile"
+@rendermode InteractiveServer
+
+<PageTitle>Register</PageTitle>
+
+<div class="section-container">
+    @* ANONYMOUS *@
+    <div class="log-links-group">
+        <a href="/" class="component-log-button">Register</a>
+    </div>
+    <form action="/profile" method="post">
+        <AntiforgeryToken />
+        <div class="form-group">
+            <h2>Login</h2>
+            <hr />
+            <div class="component-form-container">
+                <label class="label" for="email">Email:</label><br>
+                <input type="email" id="email" name="email" placeholder=">" required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="password">Password:</label><br>
+                <input
+                    type='@(loginPasswordVisible ? "text" : "password")'
+                    id="password"
+                    name="password"
+                    minlength="8"
+                    placeholder=">"
+                    @bind-Value="loginPassword" @bind-Value:event="oninput"
+                    required><br>
+            </div>
+
+            <div class="component-form-container">
+                <input
+                    type="checkbox"
+                    @onclick="() => loginPasswordVisible = !loginPasswordVisible">
+                    <span class="component-form-password-show">Show Password</span>
+            </div>
+
+            <div class="component-form-container">
+                <input type="submit" value="Submit" class="component-submit-button">
+            </div>
+
+            @* {% if status_message %}<p>{{ status_message }}</p>{% endif %} *@
+        </div>
+    </form>
+    @* END ANONYMOUS *@
+
+    @* LOGGED IN and NO MFA *@
+    <form action="/logout" method="post">
+        <AntiforgeryToken />
+        <div class="log-group">
+            <input type="submit" value="Logout" class="component-logout-button">
+        </div>
+    </form>
+    <form action="/update" method="post">
+        <AntiforgeryToken />
+        <div class="form-group">
+            <h2>Profile</h2>
+            <hr />
+            <div class="component-form-container">
+                <label class="label" for="first_name">First name:</label><br>
+                <input type="text" id="first_name" name="first_name" value="" placeholder=">" required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="last_name">Last name:</label><br>
+                <input type="text" id="last_name" name="last_name" value="" placeholder=">" required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="email">Email:</label><br>
+                <input type="email" id="email" name="email" placeholder=">" required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="password">Password:</label><br>
+                <input
+                    type='@(isPasswordVisible ? "text" : "password")'
+                    id="password"
+                    name="password"
+                    minlength="8"
+                    placeholder=">"
+                    @bind-Value="password" @bind-Value:event="oninput"
+                    required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="password">New Password:</label><br>
+                <input
+                    type='@(isPasswordVisible ? "text" : "password")'
+                    id="new_password"
+                    name="new_password"
+                    minlength="8"
+                    placeholder=">"
+                    @bind-Value="newPassword" @bind-Value:event="oninput"
+                    required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="password_confirm">Confirm New Password:</label><br>
+                <input
+                    type='@(isPasswordVisible ? "text" : "password")'
+                    id="password_confirm"
+                    name="password_confirm"
+                    minlength="8"
+                    placeholder=">"
+                    @bind-Value="passwordConfirm" @bind-Value:event="oninput"
+                    required><br>
+                    @if (!string.IsNullOrWhiteSpace(newPassword) && !string.IsNullOrWhiteSpace(passwordConfirm))
+                    {
+                        @if (newPassword == passwordConfirm)
+                        {
+                    <span class="passwords-match-icons">✔</span>
+                        } else {
+                    <span class="passwords-match-icons">✘</span>
+                        }
+                    }
+            </div>
+
+            <div class="component-form-container">
+                <input
+                    type="checkbox"
+                    @onclick="() => isPasswordVisible = !isPasswordVisible">
+                    <span class="component-form-password-show">Show Password</span>
+            </div>
+
+            <div class="component-form-container">
+                <input type="submit" value="Submit" class="component-submit-button">
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(newPassword))
+            {
+            <div class="password-strength">
+                <div id="message">
+                    <h4>Password must contain the following:</h4>
+                    <p class='@(newPassword.Any(char.IsLower) ? "valid" : "invalid")'>A <b>lowercase</b> letter</p>
+                    <p class='@(newPassword.Any(char.IsUpper) ? "valid" : "invalid")'>A <b>capital (uppercase)</b> letter</p>
+                    <p class='@(newPassword.Any(char.IsDigit) ? "valid" : "invalid")'>A <b>number</b></p>
+                    <p class='@(newPassword?.Length >= 8 ? "valid" : "invalid")'>Minimum <b>8 characters</b></p>
+                </div>
+            </div>
+            }
+
+            @* {% if status_message %}<p>{{ status_message }}</p>{% endif %} *@
+        </div>
+    </form>
+    @* END LOGGED IN and NO MFA *@
+
+    @* LOGGED IN and MFA *@
+    <form action="/logout" method="post">
+        <AntiforgeryToken />
+        <div class="log-group">
+            <input type="submit" value="Logout" class="component-logout-button">
+        </div>
+    </form>
+    <form action="/profile" method="post">
+        <AntiforgeryToken />
+        <div class="form-group">
+            <h2>Two-Factor Authentication</h2>
+            <hr />
+            <p>Please use your authenticator app <br>(such as Authy or Google Authenticator) <br>to scan this QR code.</p>
+            <hr />
+            <img src="" style="max-height: 200px; max-width: 200px;">
+            <div class="component-form-container">
+                <label class="label" for="code">Enter the code from your authenticator app:</label><br>
+                <input type="text" id="code" name="code" value="" placeholder=">" required><br>
+            </div>
+            <div class="component-form-container">
+                <input type="submit" value="Validate Code" class="component-submit-button">
+            </div>
+            @* {% if status_message %}<p>{{ status_message }}</p>{% endif %} *@
+        </div>
+    </form>
+    @* END LOGGED IN and MFA *@
+</div>
+
+@code {
+    private string loginPassword = string.Empty;
+    private bool loginPasswordVisible = false;
+
+    private string password = string.Empty;
+    private string newPassword = string.Empty;
+    private string passwordConfirm = string.Empty;
+    private bool isPasswordVisible = false;
+}

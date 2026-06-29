@@ -1,0 +1,98 @@
+﻿@using System.Linq
+@page "/"
+@rendermode InteractiveServer
+
+<PageTitle>Register</PageTitle>
+
+<div class="section-container">
+    <div class="log-links-group">
+        <a href="/profile" class="component-log-button">Login</a>
+    </div>
+    <form action="/" method="post">
+        <AntiforgeryToken />
+        <div class="form-group">
+            <h2>Register</h2>
+            <hr />
+            <div class="component-form-container">
+                <label class="label" for="first_name">First name:</label><br>
+                <input type="text" id="first_name" name="first_name" value="" placeholder=">" required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="last_name">Last name:</label><br>
+                <input type="text" id="last_name" name="last_name" value="" placeholder=">" required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="email">Email:</label><br>
+                <input type="email" id="email" name="email" placeholder=">" required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="password">Password:</label><br>
+                <input
+                    type='@(isPasswordVisible ? "text" : "password")'
+                    id="password"
+                    name="password"
+                    minlength="8"
+                    placeholder=">"
+                    @bind-Value="password" @bind-Value:event="oninput"
+                    required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="password_confirm">Confirm Password:</label><br>
+                <input
+                    type='@(isPasswordVisible ? "text" : "password")'
+                    id="password_confirm"
+                    name="password_confirm"
+                    minlength="8"
+                    placeholder=">"
+                    @bind-Value="passwordConfirm" @bind-Value:event="oninput"
+                    required><br>
+                    @if (!string.IsNullOrWhiteSpace(password) && !string.IsNullOrWhiteSpace(passwordConfirm))
+                    {
+                        @if (password == passwordConfirm)
+                        {
+                    <span class="passwords-match-icons">✔</span>
+                        } else {
+                    <span class="passwords-match-icons">✘</span>
+                        }
+                    }
+            </div>
+
+            <div class="component-form-container">
+                <input
+                    type="checkbox"
+                    @onclick="() => isPasswordVisible = !isPasswordVisible">
+                    <span class="component-form-password-show">Show Password</span>
+            </div>
+
+            <div class="component-form-container">
+                <input type="submit" value="Submit" class="component-submit-button">
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(password))
+            {
+            <div class="password-strength">
+                <div id="message">
+                    <h4>Password must contain the following:</h4>
+                    <p class='@(password.Any(char.IsLower) ? "valid" : "invalid")'>A <b>lowercase</b> letter</p>
+                    <p class='@(password.Any(char.IsUpper) ? "valid" : "invalid")'>A <b>capital (uppercase)</b> letter</p>
+                    <p class='@(password.Any(char.IsDigit) ? "valid" : "invalid")'>A <b>number</b></p>
+                    <p class='@(password?.Length >= 8 ? "valid" : "invalid")'>Minimum <b>8 characters</b></p>
+                </div>
+            </div>
+            }
+
+
+            @* {% if status_message %}<p>{{ status_message }}</p>{% endif %} *@
+        </div>
+    </form>
+</div>
+
+@code {
+    private string password = string.Empty;
+    private string passwordConfirm = string.Empty;
+    private bool isPasswordVisible = false;
+}
