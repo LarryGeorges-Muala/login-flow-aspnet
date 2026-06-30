@@ -1,0 +1,144 @@
+﻿@using System.Linq
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Net.Http.Json
+@page "/login"
+@inject HttpClient Http
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Login</PageTitle>
+
+<div class="section-container">
+
+    <div class="log-links-group">
+        <a href="/" class="component-log-button">Register</a>
+    </div>
+    <form method="post" @onsubmit="LoginClient" @formname="login">
+        <AntiforgeryToken />
+        <div class="form-group">
+            <h2>Login</h2>
+            <hr />
+            <div class="component-form-container">
+                <label class="label" for="email">Email:</label><br>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder=">"
+                    @bind-Value="email" @bind-Value:event="oninput"
+                    required><br>
+            </div>
+
+            <div class="component-form-container">
+                <label class="label" for="password">Password:</label><br>
+                <input
+                    type='@(isPasswordVisible ? "text" : "password")'
+                    id="password"
+                    name="password"
+                    minlength="8"
+                    placeholder=">"
+                    @bind-Value="password" @bind-Value:event="oninput"
+                    required><br>
+            </div>
+
+            <div class="component-form-container">
+                <input
+                    type="checkbox"
+                    @onclick="() => isPasswordVisible = !isPasswordVisible">
+                    <span class="component-form-password-show">Show Password</span>
+            </div>
+
+            <div class="component-form-container">
+                <input type="submit" value="Submit" class="component-submit-button">
+            </div>
+
+            @if (apiResponse != null)
+            {
+                <p>@apiResponse</p>
+            }
+        </div>
+    </form>
+
+</div>
+
+@code {
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private bool isPasswordVisible = false;
+    private string? apiResponse;
+    private bool? requestCompleted;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Session Only
+                var authSession = await ProtectedSessionStore.GetAsync<string>("isAuthenticated");
+                var authToken = authSession.Success ? authSession.Value : "";
+                if (authSession.Success)
+                {
+                    // Redirect to MFA
+                    NavigationManager.NavigateTo("/mfa", replace: true, forceLoad: false);
+                }
+            }
+            catch (Exception ex)
+            {
+                apiResponse = $"Error: {ex.Message}";
+                await ProtectedSessionStore.DeleteAsync("isAuthenticated");
+                await ProtectedSessionStore.DeleteAsync("isMfaAuthenticated");
+                NavigationManager.NavigateTo("/", replace: true, forceLoad: false);
+            }
+        }
+    }
+
+    private async Task LoginClient()
+    {
+        try
+        {
+            var newClient = new ClientDto { 
+                UserName = email,
+                Password = password,
+                Email = email
+            };
+            HttpResponseMessage response = await Http.PostAsJsonAsync("api/ClientItems/login", newClient);
+            response.EnsureSuccessStatusCode();
+            var responseBody = await response.Content.ReadFromJsonAsync<ApiResponseDto>();
+            apiResponse = responseBody?.Message;
+            requestCompleted = responseBody?.Completed;
+            if (requestCompleted == true)
+            {
+                // Set Login Session
+                await ProtectedSessionStore.SetAsync("isAuthenticated", email);
+                // Complete
+                await Task.CompletedTask;
+                // Redirect to MFA
+                NavigationManager.NavigateTo("/mfa", replace: true, forceLoad: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            apiResponse = $"Error: {ex.Message}";
+        }
+    }
+
+    private class ApiResponseDto
+    {
+        public string Message { get; set; } = string.Empty;
+        public bool Completed { get; set; } = false;
+    }
+
+    private class ClientDto
+    {
+        public string? UserName { get; set; } = string.Empty;
+        public string? Password { get; set; } = string.Empty;
+        public string? Email { get; set; } = string.Empty;
+    }
+}

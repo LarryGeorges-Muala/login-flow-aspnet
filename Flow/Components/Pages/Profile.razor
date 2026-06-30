@@ -1,77 +1,58 @@
 ﻿@using System.Linq
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Net.Http.Json
 @page "/profile"
+@inject HttpClient Http
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
 @rendermode InteractiveServer
 
-<PageTitle>Register</PageTitle>
+<PageTitle>Profile</PageTitle>
 
 <div class="section-container">
-    @* ANONYMOUS *@
-    <div class="log-links-group">
-        <a href="/" class="component-log-button">Register</a>
-    </div>
-    <form action="/profile" method="post">
-        <AntiforgeryToken />
-        <div class="form-group">
-            <h2>Login</h2>
-            <hr />
-            <div class="component-form-container">
-                <label class="label" for="email">Email:</label><br>
-                <input type="email" id="email" name="email" placeholder=">" required><br>
-            </div>
 
-            <div class="component-form-container">
-                <label class="label" for="password">Password:</label><br>
-                <input
-                    type='@(loginPasswordVisible ? "text" : "password")'
-                    id="password"
-                    name="password"
-                    minlength="8"
-                    placeholder=">"
-                    @bind-Value="loginPassword" @bind-Value:event="oninput"
-                    required><br>
-            </div>
-
-            <div class="component-form-container">
-                <input
-                    type="checkbox"
-                    @onclick="() => loginPasswordVisible = !loginPasswordVisible">
-                    <span class="component-form-password-show">Show Password</span>
-            </div>
-
-            <div class="component-form-container">
-                <input type="submit" value="Submit" class="component-submit-button">
-            </div>
-
-            @* {% if status_message %}<p>{{ status_message }}</p>{% endif %} *@
-        </div>
-    </form>
-    @* END ANONYMOUS *@
-
-    @* LOGGED IN and NO MFA *@
-    <form action="/logout" method="post">
+    <form @onsubmit="Logout" method="post">
         <AntiforgeryToken />
         <div class="log-group">
             <input type="submit" value="Logout" class="component-logout-button">
         </div>
     </form>
-    <form action="/update" method="post">
+    <form method="post" @onsubmit="UpdateClient" @formname="update">
         <AntiforgeryToken />
         <div class="form-group">
             <h2>Profile</h2>
             <hr />
             <div class="component-form-container">
                 <label class="label" for="first_name">First name:</label><br>
-                <input type="text" id="first_name" name="first_name" value="" placeholder=">" required><br>
+                <input
+                    type="text"
+                    id="firstName"
+                    name="firstName"
+                    placeholder=">"
+                    @bind-Value="firstName" @bind-Value:event="oninput"
+                    required><br>
             </div>
 
             <div class="component-form-container">
                 <label class="label" for="last_name">Last name:</label><br>
-                <input type="text" id="last_name" name="last_name" value="" placeholder=">" required><br>
+                <input
+                    type="text"
+                    id="last_name"
+                    name="last_name"
+                    placeholder=">"
+                    @bind-Value="lastName" @bind-Value:event="oninput"
+                    required><br>
             </div>
 
             <div class="component-form-container">
                 <label class="label" for="email">Email:</label><br>
-                <input type="email" id="email" name="email" placeholder=">" required><br>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder=">"
+                    @bind-Value="newEmail" @bind-Value:event="oninput"
+                    required><br>
             </div>
 
             <div class="component-form-container">
@@ -142,46 +123,133 @@
                 </div>
             </div>
             }
+            @if (apiResponse != null)
+            {
+                <p>@apiResponse</p>
+            }
+        </div>
+    </form>
 
-            @* {% if status_message %}<p>{{ status_message }}</p>{% endif %} *@
-        </div>
-    </form>
-    @* END LOGGED IN and NO MFA *@
-
-    @* LOGGED IN and MFA *@
-    <form action="/logout" method="post">
-        <AntiforgeryToken />
-        <div class="log-group">
-            <input type="submit" value="Logout" class="component-logout-button">
-        </div>
-    </form>
-    <form action="/profile" method="post">
-        <AntiforgeryToken />
-        <div class="form-group">
-            <h2>Two-Factor Authentication</h2>
-            <hr />
-            <p>Please use your authenticator app <br>(such as Authy or Google Authenticator) <br>to scan this QR code.</p>
-            <hr />
-            <img src="" style="max-height: 200px; max-width: 200px;">
-            <div class="component-form-container">
-                <label class="label" for="code">Enter the code from your authenticator app:</label><br>
-                <input type="text" id="code" name="code" value="" placeholder=">" required><br>
-            </div>
-            <div class="component-form-container">
-                <input type="submit" value="Validate Code" class="component-submit-button">
-            </div>
-            @* {% if status_message %}<p>{{ status_message }}</p>{% endif %} *@
-        </div>
-    </form>
-    @* END LOGGED IN and MFA *@
 </div>
 
 @code {
-    private string loginPassword = string.Empty;
-    private bool loginPasswordVisible = false;
-
+    private string firstName = string.Empty;
+    private string lastName = string.Empty;
+    private string email = string.Empty;
+    private string newEmail = string.Empty;
     private string password = string.Empty;
     private string newPassword = string.Empty;
     private string passwordConfirm = string.Empty;
     private bool isPasswordVisible = false;
+    private string? apiResponse;
+    private bool? requestCompleted;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Session Only
+                var authSession = await ProtectedSessionStore.GetAsync<string>("isAuthenticated");
+                var authToken = authSession.Success ? authSession.Value : "";
+                if (!authSession.Success)
+                {
+                    // Redirect to Login
+                    NavigationManager.NavigateTo("/login", replace: true, forceLoad: false);
+                }
+                if (authSession.Success)
+                {
+                    // Check MFA
+                    var authMfaSession = await ProtectedSessionStore.GetAsync<string>("isMfaAuthenticated");
+                    var authMfaToken = authMfaSession.Success ? authMfaSession.Value : "";
+                    if (!authMfaSession.Success)
+                    {
+                        // Redirect to MFA
+                        NavigationManager.NavigateTo("/mfa", replace: true, forceLoad: false);
+                    }
+                    // Get User
+                    var clientData = await Http.GetFromJsonAsync<ClientDto>($"api/ClientItems/session/{authToken}");
+                    // Profile
+                    firstName = clientData.FirstName;
+                    lastName = clientData.LastName;
+                    email = clientData.Email;
+                    newEmail = clientData.Email;
+                    StateHasChanged();
+                }
+            }
+            catch (Exception ex)
+            {
+                apiResponse = $"Error: {ex.Message}";
+                await ProtectedSessionStore.DeleteAsync("isAuthenticated");
+                await ProtectedSessionStore.DeleteAsync("isMfaAuthenticated");
+                NavigationManager.NavigateTo("/", replace: true, forceLoad: false);
+            }
+        }
+    }
+
+    private async Task UpdateClient()
+    {
+        try
+        {
+            var newClient = new ClientDto { 
+                UserName = email,
+                Password = password,
+                PasswordStateChange = newPassword,
+                FirstName = firstName,
+                LastName = lastName,
+                Email = email,
+                EmailStateChange = newEmail,
+                LastUpdated = DateTime.Now
+            };
+            HttpResponseMessage response = await Http.PostAsJsonAsync("api/ClientItems/update", newClient);
+            response.EnsureSuccessStatusCode();
+            var responseBody = await response.Content.ReadFromJsonAsync<ApiResponseDto>();
+            apiResponse = responseBody?.Message;
+            requestCompleted = responseBody?.Completed;
+            if (requestCompleted == true)
+            {
+                // Set Login Session
+                await ProtectedSessionStore.SetAsync("isAuthenticated", email);
+                // Complete
+                await Task.CompletedTask;
+                // Redirect to Profile
+                NavigationManager.NavigateTo("/profile", replace: true, forceLoad: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            apiResponse = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task Logout()
+    {
+        await ProtectedSessionStore.DeleteAsync("isAuthenticated");
+        await ProtectedSessionStore.DeleteAsync("isMfaAuthenticated");
+        NavigationManager.NavigateTo("/login", replace: true, forceLoad: false);
+    }
+
+    private class ApiResponseDto
+    {
+        public string Message { get; set; } = string.Empty;
+        public bool Completed { get; set; } = false;
+    }
+
+    private class ClientDto
+    {
+        public string? UserName { get; set; } = string.Empty;
+        public string? Password { get; set; } = string.Empty;
+        public string? PasswordStateChange { get; set; } = string.Empty;
+        public string? FirstName { get; set; } = string.Empty;
+        public string? LastName { get; set; } = string.Empty;
+        public string? Email { get; set; } = string.Empty;
+        public string? EmailStateChange { get; set; } = string.Empty;
+        public DateTime? LastUpdated { get; set; } = DateTime.Now;
+    }
 }

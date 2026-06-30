@@ -1,0 +1,179 @@
+﻿@using System.Linq
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Net.Http.Json
+@page "/mfa"
+@inject HttpClient Http
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>MFA</PageTitle>
+
+<div class="section-container">
+
+    <form @onsubmit="Logout" method="post">
+        <AntiforgeryToken />
+        <div class="log-group">
+            <input type="submit" value="Logout" class="component-logout-button">
+        </div>
+    </form>
+    <form method="post" @onsubmit="VerifyMFA" @formname="VerifyMFAForm">
+        <AntiforgeryToken />
+        <div class="form-group">
+            <h2>Two-Factor Authentication</h2>
+            <hr />
+            <p>Please use your authenticator app <br>(such as Authy or Google Authenticator) <br>to scan this QR code.</p>
+            <hr />
+            <img src="data:image/png;base64,@QrCodeBase64" alt="QR Code" style="max-height: 200px; max-width: 200px;" />
+            <div class="component-form-container">
+                <label class="label" for="code">Enter the code from your authenticator app:</label><br>
+                <input
+                    type="text"
+                    id="code"
+                    name="code"
+                    placeholder=">"
+                    @bind-Value="codeMFA" @bind-Value:event="oninput"
+                    required><br>
+            </div>
+            <div class="component-form-container">
+                <input type="submit" value="Validate Code" class="component-submit-button">
+            </div>
+            @if (apiResponse != null)
+            {
+                <p>@apiResponse</p>
+            }
+        </div>
+    </form>
+
+
+</div>
+
+@code {
+    private string codeMFA = string.Empty;
+    private bool isAuthenticated = false;
+    private bool mfaAuthenticated = false;
+    private string? apiResponse;
+    private string QrCodeBase64 { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Session Only
+                var authSession = await ProtectedSessionStore.GetAsync<string>("isAuthenticated");
+                var authToken = authSession.Success ? authSession.Value : "";
+                if (!authSession.Success)
+                {
+                    // Redirect to Login
+                    NavigationManager.NavigateTo("/login", replace: true, forceLoad: false);
+                }
+                if (authSession.Success)
+                {
+                    // Check MFA
+                    var authMfaSession = await ProtectedSessionStore.GetAsync<string>("isMfaAuthenticated");
+                    var authMfaToken = authMfaSession.Success ? authMfaSession.Value : "";
+                    if (authMfaSession.Success)
+                    {
+                        // Redirect to Profile
+                        NavigationManager.NavigateTo("/profile", replace: true, forceLoad: false);
+                    }
+                    if (!authMfaSession.Success)
+                    {
+                        // Generate QR Code
+                        isAuthenticated = false;
+                        // Get User
+                        try
+                        {
+                            var clientData = await Http.GetFromJsonAsync<ClientDto>($"api/ClientItems/session/{authToken}");
+                            if (clientData.Enabled)
+                            {
+                                if (clientData.Active)
+                                {
+                                    // MFA Done - Set Session
+                                    await ProtectedSessionStore.SetAsync("isMfaAuthenticated", clientData.Email);
+                                    // Redirect to Profile
+                                    NavigationManager.NavigateTo("/profile", replace: true, forceLoad: false);
+                                }
+                                if (!clientData.Active)
+                                {
+                                    // Generate QR Code
+                                    using (QRCoder.QRCodeGenerator qrGenerator = new QRCoder.QRCodeGenerator())
+                                    {
+                                        using (QRCoder.QRCodeData qrCodeData = qrGenerator.CreateQrCode(clientData.QrCodeUrl, QRCoder.QRCodeGenerator.ECCLevel.Q))
+                                        {
+                                            using (QRCoder.PngByteQRCode qrCode = new QRCoder.PngByteQRCode(qrCodeData))
+                                            {
+                                                byte[] qrCodeAsPngBytes = qrCode.GetGraphic(20);
+                                                QrCodeBase64 = Convert.ToBase64String(qrCodeAsPngBytes);
+                                                StateHasChanged();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            apiResponse = $"Error: {ex.Message}";
+                            await ProtectedSessionStore.DeleteAsync("isAuthenticated");
+                            await ProtectedSessionStore.DeleteAsync("isMfaAuthenticated");
+                            NavigationManager.NavigateTo("/", replace: true, forceLoad: false);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                apiResponse = $"Error: {ex.Message}";
+                await ProtectedSessionStore.DeleteAsync("isAuthenticated");
+                await ProtectedSessionStore.DeleteAsync("isMfaAuthenticated");
+                NavigationManager.NavigateTo("/", replace: true, forceLoad: false);
+            }
+        }
+    }
+
+    private async Task VerifyMFA()
+    {
+        // Read from session
+        var authSession = await ProtectedSessionStore.GetAsync<string>("isAuthenticated");
+        var authToken = authSession.Success ? authSession.Value : "";
+        // Get User
+        var clientData = await Http.GetFromJsonAsync<ClientDto>($"api/ClientItems/otp/{authToken}/{codeMFA}");
+        // Set Login Session
+        await ProtectedSessionStore.SetAsync("isAuthenticated", clientData.Email);
+        await ProtectedSessionStore.SetAsync("isMfaAuthenticated", clientData.Email);
+        NavigationManager.NavigateTo("/profile", replace: true, forceLoad: false);
+    }
+
+    private async Task Logout()
+    {
+        await ProtectedSessionStore.DeleteAsync("isAuthenticated");
+        await ProtectedSessionStore.DeleteAsync("isMfaAuthenticated");
+        // Redirect to Login
+        NavigationManager.NavigateTo("/login", replace: true, forceLoad: false);
+    }
+
+    private class ClientDto
+    {
+        public long Id { get; set; }
+        public string? UserName { get; set; } = string.Empty;
+        public string? Password { get; set; } = string.Empty;
+        public string? FirstName { get; set; } = string.Empty;
+        public string? LastName { get; set; } = string.Empty;
+        public string? Email { get; set; } = string.Empty;
+        public bool Enabled { get; set; } = true;
+        public bool Active { get; set; } = false;
+        public string? Token { get; set; } = string.Empty;
+        public string? QrCode { get; set; } = string.Empty;
+        public string? QrCodeUrl { get; set; } = string.Empty;
+        public DateTime? CreatedDate { get; set; } = DateTime.Now;
+        public DateTime? LastUpdated { get; set; } = DateTime.Now;
+    }
+}
