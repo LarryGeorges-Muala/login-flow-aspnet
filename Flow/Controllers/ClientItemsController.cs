@@ -38,35 +38,11 @@ namespace Flow.Controllers
             {
                 return NotFound();
             }
-
-            // var clientItem = await _context.ClientItems.FindAsync(id);
-
-            // if (clientItem == null)
-            // {
-            //     return NotFound();
-            // }
-
-            // return _context.ClientItems.FirstOrDefault(u => u.Email == email);
-            
-            // Decrypt
-
-            // var encryptionKey = AesProtector.GenerateRandomKey();
-            // var test = "aaaaa";
-            // Console.WriteLine(eeekey);
-            // var eee = AesProtector.Encrypt(test, eeekey);
-            // Console.WriteLine(eee);
-            // var fff = AesProtector.Decrypt(eee, eeekey);
-            // Console.WriteLine(fff);
-            // Console.WriteLine("----------------------------");
-
-            // Console.WriteLine("######################################");
-            // var encryptionKey = AesProtector.GenerateRandomKey();
-            // Console.WriteLine(encryptionKey);
-            // Console.WriteLine("######################################");
-            // Console.WriteLine(clientData.QrCodeUrl);
-            // clientData.QrCodeUrl = AesProtector.Decrypt(clientData.QrCodeUrl, encryptionKey);
-            // Console.WriteLine(clientData.QrCodeUrl);
-
+            // Decryption
+            string encryptionKeyStr = Environment.GetEnvironmentVariable("AesProtector");
+            byte[] encryptionKey = Convert.FromBase64String(encryptionKeyStr);
+            clientData.Token = AesProtector.Decrypt(clientData.Token, encryptionKey);
+            clientData.QrCodeUrl = AesProtector.Decrypt(clientData.QrCodeUrl, encryptionKey);
             return clientData;
         }
 
@@ -77,61 +53,24 @@ namespace Flow.Controllers
             if (clientData == null) {
                 return NotFound();
             }
-
+            // Decryption
+            string encryptionKeyStr = Environment.GetEnvironmentVariable("AesProtector");
+            byte[] encryptionKey = Convert.FromBase64String(encryptionKeyStr);
+            clientData.Token = AesProtector.Decrypt(clientData.Token, encryptionKey);
+            clientData.QrCodeUrl = AesProtector.Decrypt(clientData.QrCodeUrl, encryptionKey);
+            // TOTP
             byte[] secretBytes = Base32Encoding.ToBytes(clientData.Token);
             var totpEvaluator = new Totp(secretBytes);
-
-            // Verification handles minor time drifts natively using verification windows
             bool isValid = totpEvaluator.VerifyTotp(code, out long timeWindowStep);
+            // Re-Encrypt
+            clientData.Token = AesProtector.Encrypt(clientData.Token, encryptionKey);
+            clientData.QrCodeUrl = AesProtector.Encrypt(clientData.QrCodeUrl, encryptionKey);
             if (isValid)
             {
                 clientData.Active = true;
                 await _context.SaveChangesAsync();
             }
-
-            // var clientItem = await _context.ClientItems.FindAsync(id);
-
-            // if (clientItem == null)
-            // {
-            //     return NotFound();
-            // }
-
-            // return _context.ClientItems.FirstOrDefault(u => u.Email == email);
-            
-            // Decrypt
-
-            // var encryptionKey = AesProtector.GenerateRandomKey();
-            // var test = "aaaaa";
-            // Console.WriteLine(eeekey);
-            // var eee = AesProtector.Encrypt(test, eeekey);
-            // Console.WriteLine(eee);
-            // var fff = AesProtector.Decrypt(eee, eeekey);
-            // Console.WriteLine(fff);
-            // Console.WriteLine("----------------------------");
-
-            // Console.WriteLine("######################################");
-            // var encryptionKey = AesProtector.GenerateRandomKey();
-            // Console.WriteLine(encryptionKey);
-            // Console.WriteLine("######################################");
-            // Console.WriteLine(clientData.QrCodeUrl);
-            // clientData.QrCodeUrl = AesProtector.Decrypt(clientData.QrCodeUrl, encryptionKey);
-            // Console.WriteLine(clientData.QrCodeUrl);
-
             return clientData;
-        }
-
-        // GET: api/ClientItems/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ClientItem>> GetClientItem(long id)
-        {
-            var clientItem = await _context.ClientItems.FindAsync(id);
-
-            if (clientItem == null)
-            {
-                return NotFound();
-            }
-
-            return clientItem;
         }
 
         // POST: api/ClientItems
@@ -139,16 +78,6 @@ namespace Flow.Controllers
         [HttpPost]
         public async Task<ActionResult<ClientItem>> PostClientItem(ClientItem clientItem)
         {
-
-            // var encryptionKey = AesProtector.GenerateRandomKey();
-            // var test = "aaaaa";
-            // Console.WriteLine(eeekey);
-            // var eee = AesProtector.Encrypt(test, eeekey);
-            // Console.WriteLine(eee);
-            // var fff = AesProtector.Decrypt(eee, eeekey);
-            // Console.WriteLine(fff);
-            // Console.WriteLine("----------------------------");
-
             // Post Data - First Name
             if (clientItem.FirstName == null)
             {
@@ -175,7 +104,6 @@ namespace Flow.Controllers
             {
                 return Ok(new { Message = "Existing account, please login...", Completed = false });
             }
-
             // Hash Password
             string hashedPassword = BCrypt.Net.BCrypt.EnhancedHashPassword(clientItem.Password, workFactor: 12);
             bool isValid = BCrypt.Net.BCrypt.EnhancedVerify(clientItem.Password, hashedPassword);
@@ -183,40 +111,20 @@ namespace Flow.Controllers
             {
                 clientItem.Password = hashedPassword;
             }
-
             // Generate TOTP
             // 160-bit secret key is standard for TOTP
             byte[] secretBytes = KeyGeneration.GenerateRandomKey(20); 
             string secretBase32 = Base32Encoding.ToString(secretBytes);
-
             // Standardized format that Authenticator apps recognize
             var appIssuer = "ASP.NET Login Flow App";
             string qrCodeUri = $"otpauth://totp/{Uri.EscapeDataString(appIssuer)}:{Uri.EscapeDataString(clientItem.Email)}?secret={secretBase32}&issuer={Uri.EscapeDataString(appIssuer)}&digits=6&period=30";
+            // Encryption
+            string encryptionKeyStr = Environment.GetEnvironmentVariable("AesProtector");
+            byte[] encryptionKey = Convert.FromBase64String(encryptionKeyStr);
+            clientItem.Token = AesProtector.Encrypt(secretBase32, encryptionKey);
+            clientItem.QrCodeUrl = AesProtector.Encrypt(qrCodeUri, encryptionKey);
             // clientItem.Token = secretBase32;
             // clientItem.QrCodeUrl = qrCodeUri;
-
-
-            // Console.WriteLine("######################################");
-            // Console.WriteLine("######################################");
-            // Console.WriteLine("######################################");
-            // var encryptionKey = AesProtector.GenerateRandomKey();
-            // Console.WriteLine(encryptionKey);
-            // Console.WriteLine("######################################");
-            // Console.WriteLine("######################################");
-            // Console.WriteLine("######################################");
-
-            // clientItem.Token = AesProtector.Encrypt(secretBase32, encryptionKey);
-            // clientItem.QrCodeUrl = AesProtector.Encrypt(qrCodeUri, encryptionKey);
-
-            clientItem.Token = secretBase32;
-            clientItem.QrCodeUrl = qrCodeUri;
-
-            // var eeekey = AesProtector.GenerateRandomKey();
-            // var test = "aaaaa";
-            // Console.WriteLine(eeekey);
-            // var eee = AesProtector.Encrypt(test, eeekey);
-            // Console.WriteLine(eee);
-
             // Create New User
             _context.ClientItems.Add(clientItem);
             await _context.SaveChangesAsync();

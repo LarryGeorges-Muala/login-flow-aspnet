@@ -45,17 +45,9 @@ app.MapRazorComponents<App>()
 // Map your API routes
 app.MapControllers(); 
 
+// Encryption Key
 var encryptionKey = AesProtector.GenerateRandomKey();
 string? encryptionKeyString = Convert.ToBase64String(encryptionKey);
-// string? encryptionKeyString = Encoding.UTF8.GetString(encryptionKey);
-Console.WriteLine(encryptionKeyString);
-// Environment.SetEnvironmentVariable("AesProtector", encryptionKeyString, EnvironmentVariableTarget.Machine);
 Environment.SetEnvironmentVariable("AesProtector", encryptionKeyString);
-
-// string machineVal = Environment.GetEnvironmentVariable("AesProtector", EnvironmentVariableTarget.Machine);
-string machineVal = Environment.GetEnvironmentVariable("AesProtector");
-Console.WriteLine(machineVal);
-byte[] decodedBytes = Convert.FromBase64String(machineVal);
-Console.WriteLine(decodedBytes);
 
 app.Run();

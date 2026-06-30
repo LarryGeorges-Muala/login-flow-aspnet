@@ -50,7 +50,6 @@
 
 @code {
     private string codeMFA = string.Empty;
-    private bool isAuthenticated = false;
     private bool mfaAuthenticated = false;
     private string? apiResponse;
     private string QrCodeBase64 { get; set; }
@@ -87,8 +86,6 @@
                     if (!authMfaSession.Success)
                     {
                         // Generate QR Code
-                        isAuthenticated = false;
-                        // Get User
                         try
                         {
                             var clientData = await Http.GetFromJsonAsync<ClientDto>($"api/ClientItems/session/{authToken}");

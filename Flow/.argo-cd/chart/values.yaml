@@ -1,0 +1,262 @@
+# Default values for website Backend .Net.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+super-chart:
+  namespace: "dev"
+
+  imagePullSecrets: []
+
+  nameOverride: ""
+
+  fullnameOverride: "website"
+
+  secrets:
+    - name: env-secret-aspnet
+      type: env
+      variables:
+        ENV: local
+    - name: env-secret-rabbitmq
+      type: env
+      variables:
+        RABBITMQ_DEFAULT_USER: guest
+        RABBITMQ_DEFAULT_PASS: guest
+
+  deployments:
+    - name: "backend"
+      kind: Deployment
+      replicaCount: 1
+      containers:
+        - name: "api"
+          envFrom:
+            - secretRef:
+                name: env-secret-aspnet
+          startup:
+            enabled: true
+            command: ["/bin/sh"]
+            args:
+              - dotnet Flow.dll;
+          targetGroupBinding:
+            enabled: false
+            arn: ""
+            securityGroup: ""
+          image:
+            repository: python
+            pullPolicy: IfNotPresent
+            tag: "3.12-slim"
+          podAnnotations: {}
+          podLabels: {}
+          podSecurityContext: {}
+          securityContext: {}
+          service:
+            enabled: true
+            scheme: internal
+            type: ClusterIP
+            port: 8000
+            extraPorts:
+              - name: default
+                enabled: true
+                port: 80
+                protocol: TCP
+              - name: https
+                enabled: true
+                port: 443
+                protocol: TCP
+            annotations: {}
+          ingress:
+            enabled: false
+            className: ""
+            annotations: {}
+            hosts:
+              - host: website-backend.local
+                paths:
+                  - path: /
+                    pathType: ImplementationSpecific
+            tls: []
+          httpRoute:
+            enabled: false
+            annotations: {}
+            parentRefs:
+              - name: gateway
+                sectionName: http
+            hostnames:
+              - website-backend.local
+            rules:
+              - matches:
+                - path:
+                    type: PathPrefix
+                    value: /headers
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          # livenessProbe:
+          #   exec:
+          #     command:
+          #       - whoami
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 20
+          # readinessProbe:
+          #   exec:
+          #     command:
+          #       - whoami
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 20
+          volumeMounts:
+            - mountPath: /var/aspnet
+              name: data-volume
+
+        - name: "redis"
+          startup:
+            enabled: false
+            command: ["redis-server --bind 0.0.0.0 --appendonly yes"]
+            args: []
+          targetGroupBinding:
+            enabled: false
+            arn: ""
+            securityGroup: ""
+          image:
+            repository: redis
+            pullPolicy: IfNotPresent
+            tag: "alpine"
+          podAnnotations: {}
+          podLabels: {}
+          podSecurityContext: {}
+          securityContext: {}
+          service:
+            enabled: true
+            scheme: internal
+            type: ClusterIP
+            port: 6379
+            extraPorts:
+              - name: default
+                enabled: false
+                port: 80
+                protocol: TCP
+              - name: https
+                enabled: false
+                port: 443
+                protocol: TCP
+            annotations: {}
+          ingress:
+            enabled: false
+            className: ""
+            annotations: {}
+            hosts:
+              - host: redis.local
+                paths:
+                  - path: /
+                    pathType: ImplementationSpecific
+            tls: []
+          httpRoute:
+            enabled: false
+            annotations: {}
+            parentRefs:
+              - name: gateway
+                sectionName: http
+            hostnames:
+              - redis.local
+            rules:
+              - matches:
+                - path:
+                    type: PathPrefix
+                    value: /headers
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts: []
+
+        - name: "rabbitmq"
+          envFrom:
+            - secretRef:
+                name: env-secret-rabbitmq
+          startup:
+            enabled: false
+            command: []
+            args: []
+          targetGroupBinding:
+            enabled: false
+            arn: ""
+            securityGroup: ""
+          image:
+            repository: rabbitmq
+            pullPolicy: IfNotPresent
+            tag: "management"
+          podAnnotations: {}
+          podLabels: {}
+          podSecurityContext: {}
+          securityContext: {}
+          service:
+            enabled: true
+            scheme: internal
+            type: ClusterIP
+            port: 5672
+            extraPorts:
+              - name: management
+                enabled: true
+                port: 15672
+                protocol: TCP
+              - name: https
+                enabled: false
+                port: 443
+                protocol: TCP
+            annotations: {}
+          ingress:
+            enabled: false
+            className: ""
+            annotations: {}
+            hosts:
+              - host: rabbitmq.local
+                paths:
+                  - path: /
+                    pathType: ImplementationSpecific
+            tls: []
+          httpRoute:
+            enabled: false
+            annotations: {}
+            parentRefs:
+              - name: gateway
+                sectionName: http
+            hostnames:
+              - rabbitmq.local
+            rules:
+              - matches:
+                - path:
+                    type: PathPrefix
+                    value: /headers
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts: []
+
+      serviceAccount:
+        create: true
+        automount: false
+        annotations: {}
+        name: "aspnet-service-account"
+
+      autoscaling:
+        enabled: false
+        minReplicas: 1
+        maxReplicas: 100
+        targetCPUUtilizationPercentage: 80
+        targetMemoryUtilizationPercentage: 80
+
+      volumes:
+        - name: data-volume
+          emptyDir:
+            sizeLimit: 500Mi
+
+      nodeSelector: {}
+
+      tolerations: []
+
+      volumeClaimTemplates:
+        name: ""
+        storageClassName: ""
+        storage: ""
+
+      affinity:
+        enabled: false

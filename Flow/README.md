@@ -43,15 +43,11 @@
 
 ##### Secured Browsing
 
-> RBAC Users Accounts: [django RBAC](https://docs.djangoproject.com/en/6.0/topics/auth/default/)
+> Users Passwords Auth Encryption/Hashing: [BCrypt.Net package](https://www.nuget.org/packages/BCrypt.Net-Next)
 
-> Users Passwords Auth Encryption/Hashing: [django hashing](https://docs.djangoproject.com/en/6.0/topics/auth/passwords/)
+> Users 2FA + QR Code Generation: [Otp.NET package](https://www.nuget.org/packages/Otp.NET/1.2.2)
 
-> Users 2FA + QR Code Generation: [totp package](https://pyauth.github.io/pyotp/)
-
-> Apps CSRF Tokens Generation: [django csrf](https://docs.djangoproject.com/en/6.0/ref/csrf/)
-
-> Decorated Endpoints: [django decorators](https://docs.djangoproject.com/en/6.0/topics/http/decorators/)
+> Apps CSRF Tokens Generation: [Blazor Antiforgery](https://learn.microsoft.com/en-us/aspnet/core/blazor/security/)
 
 ---
 
@@ -75,10 +71,6 @@
 
 #### Implementation: 
 
-##### Logging
-
-> Logs Sanitizing: [django logger](https://docs.djangoproject.com/en/6.0/topics/logging/)
-
 ##### Uploaded Content
 
 > Uploaded Content Isolation: [docker volumes](backend.Dockerfile) / [compose.yaml](compose.yaml)
@@ -95,7 +87,7 @@
 
 ##### Data Traffic
 
-> Database Data Anonymization: [cryptography package](https://cryptography.io/en/latest/installation/)
+> Database Data Anonymization: [System.Security.Cryptography package](https://www.nuget.org/packages/system.security.cryptography.pkcs/)
 
 ---
 
@@ -107,17 +99,7 @@
 
 ##### Auditing & Tracing
 
-> Access Auditing: [django-easy-audit package](https://pypi.org/project/django-easy-audit/)
-
-> Tracing: [opentelemetry-python package](https://opentelemetry-python.readthedocs.io/en/latest/examples/django/README.html)
-
----
-
-#### Basic Back-End Compliance Test
-
-> ```bash
-> python manage.py check --deploy
-> ```
+> Tracing: [opentelemetry-dotnet package](https://opentelemetry.io/docs/languages/dotnet/)
 
 ---
 ---
@@ -184,11 +166,9 @@
 
 ### Resources and Networking
 
-> OpenTelemetry Config: [opentelemetry-python](https://opentelemetry-python.readthedocs.io/en/latest/examples/django/README.html)
+> OpenTelemetry Config: [opentelemetry-dotnet package](https://opentelemetry.io/docs/languages/dotnet/)
 
 ### Visualization
-
-> Grafana Dashboard Metrics: [.grafana/dashboards/django-metrics-dashboard.json](.grafana/dashboards/django-metrics-dashboard.json)
 
 > Grafana Prometheus Datasource: [.grafana/datasources/prometheus-datasource.yaml](.grafana/datasources/prometheus-datasource.yaml)
 
@@ -196,7 +176,7 @@
 
 > Grafana Tempo Datasource: [.grafana/datasources/tempo-datasource.yaml](.grafana/datasources/tempo-datasource.yaml)
 
-> Grafana Alert: [.grafana/alerting/sample-django-alert.yaml](.grafana/alerting/sample-django-alert.yaml) / [.grafana/alerting/sample-django-alert-resource.yaml](.grafana/alerting/sample-django-alert-resource.yaml)
+> Grafana Alert: [.grafana/alerting/sample-aspnet-alert-resource.yaml](.grafana/alerting/sample-aspnet-alert-resource.yaml)
 
 > Grafana Container: [compose.yaml](compose.yaml)
 
@@ -214,63 +194,11 @@
 
 ---
 
-## Backend Setup
-
-> Note: Python 3.12 recommended
-
-### Venv
-
-```bash
-python3.12 -m venv ./.venv
-source ./.venv/bin/activate
-python3 -m pip install -r requirements.txt
-```
-
-### Configuration
-
-- generate a data anonymization key `CRYPTOGRAPHY_KEY` in Django shell
-```bash
-python manage.py shell
-from cryptography.fernet import Fernet
-Fernet.generate_key()
-exit()
-```
-
-- create `.env` file
-```bash
-SECRET_KEY='some-string'
-CRYPTOGRAPHY_KEY='generated-key-from-django-shell'
-SENTRY_DNS_DJANGO='https://...ingest.us.sentry.io/...'
-ALERT_MANAGER_SLACK_API_URL="https://hooks.slack.com/services/..."
-ALERT_MANAGER_SLACK_API_CHANNEL="#..."
-```
-
-> Note: see https://sentry.io/pricing/ for a Sentry free-trial account to gain access to the monitoring dashboard
-
-### Migrations
-
-- run database migration
-
-```bash
-python manage.py makemigrations
-python manage.py migrate
-```
-
-### Tests
-
-- run tests
-
-```bash
-python manage.py test flow
-```
-
----
-
 ## Backend Execution
 
 1. In terminal (Without Prometheus and Grafana stack):
 ```bash
-python3 manage.py runserver
+dotnet watch
 ```
 
 2. Orchestration with Docker Compose (With Prometheus and Grafana stack):
